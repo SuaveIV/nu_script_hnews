@@ -200,8 +200,8 @@ def format-age [time: int]: nothing -> string {
 # and drop any null/deleted stories the API may have returned.
 def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
     let fetched = ($in | compact)
-    $ids | each {|id|
-        $fetched | where {|story| $story.id? == $id} | first
+    $ids | each { |id|
+        $fetched | where { |story| $story.id? == $id } | first
     } | compact
 }
 
@@ -271,27 +271,33 @@ export def hn [
         open $cache_file
     } else {
         print $"Fetching ($feed)..."
-        try {
-            # Fetch ranked IDs
-            let ids = (
+
+        # Fetch ranked IDs
+        let ids = try {
                 http get $"https://hacker-news.firebaseio.com/v0/($feed).json"
                 | first $limit
-            )
+        } catch { |err|
+            print $"(ansi red)Error fetching IDs: ($err.msg)(ansi reset)"
+            []
+        }
 
+        if ($ids | is-empty) {
+            []
+        } else {
             # Fetch details in parallel, then restore HN rank order
             let items = (
                 $ids
-                | par-each {|id|
-                    http get $"https://hacker-news.firebaseio.com/v0/item/($id).json"
+                | compact
+                | par-each { |id|
+                    try {
+                        http get $"https://hacker-news.firebaseio.com/v0/item/($id).json"
+                    } catch { null }
                 }
                 | reorder-by-ids $ids
             )
 
             $items | save --force $cache_file
             $items
-        } catch {|err|
-            print $"(ansi red)Error fetching stories: ($err.msg)(ansi reset)"
-            return []
         }
     }
 
@@ -316,9 +322,20 @@ export def hn [
         + (if $show_type { $WIDTH_TYPE } else { 0 }))
     let title_budget = ([($term_width - $used_width), 20] | math max)
 
+    let visible_columns = [
+        "#"
+        (if $show_score { "Score" })
+        (if $show_cmts { "Cmts" })
+        (if $show_age { "Age" })
+        (if $show_domain { "Domain" })
+        (if $show_type { "Type" })
+        "Title"
+        (if $show_by { "By" })
+    ] | compact
+
     # Build display table (1-based rank for human-friendly indexing)
     let display_table = (
-        $stories | enumerate | each {|it|
+        $stories | enumerate | each { |it|
             let rank = $it.index + 1
             let item = $it.item
 
@@ -340,15 +357,17 @@ export def hn [
 
             let age_display = (format-age ($item.time? | default 0))
 
-            let rec = { "#": $rank }
-            let rec = if $show_score { $rec | insert "Score" (format-score ($item.score? | default 0)) } else { $rec }
-            let rec = if $show_cmts { $rec | insert "Cmts" $cmts_display } else { $rec }
-            let rec = if $show_age { $rec | insert "Age" $age_display } else { $rec }
-            let rec = if $show_domain { $rec | insert "Domain" (format-domain $url $icon_mode) } else { $rec }
-            let rec = if $show_type { $rec | insert "Type" (format-type $title_text $url $icon_mode) } else { $rec }
-            let rec = $rec | insert "Title" $title_display
-            let rec = if $show_by { $rec | insert "By" ($item.by? | default "?" | fill -a l -w 15) } else { $rec }
-            $rec
+            {
+                "#": $rank
+                "Score": (format-score ($item.score? | default 0))
+                "Cmts": $cmts_display
+                "Age": $age_display
+                "Domain": (format-domain $url $icon_mode)
+                "Type": (format-type $title_text $url $icon_mode)
+                "Title": $title_display
+                "By": ($item.by? | default "?" | fill -a l -w 15)
+            }
+            | select ...$visible_columns
         }
     )
 
