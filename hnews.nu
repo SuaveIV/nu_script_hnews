@@ -17,6 +17,36 @@
 #
 # Requires Nushell 0.97+ for $nu.cache-dir support.
 
+const DOMAIN_ICONS = {
+    "github.com": { nerd: "", emoji: "🐙", color: "#ffffff", tag: "git" }
+    "arxiv.org": { nerd: "", emoji: "📄", color: "#b31b1b", tag: "sci" }
+    "youtube.com": { nerd: "󰗃", emoji: "📺", color: "#ff0000", tag: "vid" }
+    "en.wikipedia.org": { nerd: "󰖬", emoji: "🌐", color: "#e6e6e6", tag: "wiki" }
+    "openai.com": { nerd: "", emoji: "🤖", color: "#74aa9c", tag: "ai" }
+    "huggingface.co": { nerd: "", emoji: "🤗", color: "#ff9000", tag: "ai" }
+    "substack.com": { nerd: "󱕬", emoji: "📧", color: "#ff6719", tag: "news" }
+    "nytimes.com": { nerd: "", emoji: "🗞️", color: "#ffffff", tag: "news" }
+    "bloomberg.com": { nerd: "󰓗", emoji: "📈", color: "#2800d7", tag: "biz" }
+    "theverge.com": { nerd: "󱐋", emoji: "⚡", color: "#ff005a", tag: "tech" }
+    "arstechnica.com": { nerd: "󰭟", emoji: "🛰️", color: "#ff4e00", tag: "tech" }
+    "medium.com": { nerd: "", emoji: "📝", color: "#ffffff", tag: "blog" }
+    "economist.com": { nerd: "󰦨", emoji: "📊", color: "#e3120b", tag: "econ" }
+    "wsj.com": { nerd: "", emoji: "📉", color: "#000000", tag: "biz" }
+    "reuters.com": { nerd: "󰎕", emoji: "🌍", color: "#ff8000", tag: "news" }
+    "paulgraham.com": { nerd: "󰠮", emoji: "🍦", color: "#f60000", tag: "yc" }
+    "danluu.com": { nerd: "󰙨", emoji: "💾", color: "#4caf50", tag: "blog" }
+    "simonwillison.net": { nerd: "󱚣", emoji: "🧠", color: "#ffcc00", tag: "blog" }
+    "jvns.ca": { nerd: "󱫐", emoji: "🪄", color: "#f06000", tag: "blog" }
+    "blog.cloudflare.com": { nerd: "", emoji: "☁️", color: "#f38020", tag: "sys" }
+}
+
+const TYPE_ICONS = {
+    ask: { nerd: "󰆆", emoji: "❓" }
+    show: { nerd: "󰈈", emoji: "👀" }
+    launch: { nerd: "󰑣", emoji: "🚀" }
+    default: { nerd: "", emoji: "•" }
+}
+
 # Format a score with color based on popularity
 def format-score [score: int]: nothing -> string {
     if $score >= 300 {
@@ -39,22 +69,95 @@ def format-comments [count: int]: nothing -> string {
     }
 }
 
-# Format a link indicator for the story URL column.
-# mode: "nerd" = Nerd Font glyph, "emoji" = 🔗, "text" = plain x / dash.
-# Shows a dim dash (or plain dash in text mode) for stories with no external URL.
-def format-link [
-    url: string
-    mode: string
-]: nothing -> string {
+# Format the domain from a URL
+def format-domain [url: string, mode: string]: nothing -> string {
     if ($url | is-empty) {
-        if $mode == "text" { "-" } else { $"(ansi grey)-(ansi reset)" }
-    } else {
-        let label = match $mode {
-            "nerd"  => $"(ansi blue)[](ansi reset)"
-            "emoji" => $"(ansi blue)[🔗](ansi reset)"
-            _       => "[x]"
+        if $mode == "text" {
+            "self"
+        } else {
+            $"(ansi light_gray)hn(ansi reset)"
         }
-        $url | ansi link --text $label
+    } else {
+        let domain = ($url | split row "/" | get 2)
+        let bare_domain = if ($domain | str starts-with "www.") {
+            $domain | str substring 4..
+        } else {
+            $domain
+        }
+
+        $bare_domain
+    }
+}
+
+# Format the post type (Ask, Show, Launch)
+def format-type [title: string, url: string, mode: string]: nothing -> string {
+    let lower = ($title | str downcase)
+    if ($lower | str starts-with "ask hn:") {
+        let icon = if $mode == "text" { "ask" } else if $mode == "emoji" { $TYPE_ICONS.ask.emoji } else { $TYPE_ICONS.ask.nerd }
+        $"(ansi yellow)($icon)(ansi reset)"
+    } else if ($lower | str starts-with "show hn:") {
+        let icon = if $mode == "text" { "show" } else if $mode == "emoji" { $TYPE_ICONS.show.emoji } else { $TYPE_ICONS.show.nerd }
+        $"(ansi green)($icon)(ansi reset)"
+    } else if ($lower | str starts-with "launch hn:") {
+        let icon = if $mode == "text" { "launch" } else if $mode == "emoji" { $TYPE_ICONS.launch.emoji } else { $TYPE_ICONS.launch.nerd }
+        $"(ansi red)($icon)(ansi reset)"
+    } else {
+        let domain_info = if ($url | is-empty) {
+            null
+        } else {
+            let domain = ($url | split row "/" | get 2)
+            let bare_domain = if ($domain | str starts-with "www.") {
+                $domain | str substring 4..
+            } else {
+                $domain
+            }
+            let match = ($DOMAIN_ICONS | transpose key info | where {|it| ($bare_domain | str downcase) | str contains $it.key})
+            if ($match | is-empty) {
+                null
+            } else {
+                $match | first | get info
+            }
+        }
+
+        if $mode == "text" {
+            if ($domain_info | is-not-empty) and ($domain_info.tag? | is-not-empty) {
+                $domain_info.tag
+            } else {
+                ""
+            }
+        } else {
+            let domain_icon = if ($domain_info | is-not-empty) {
+                let icon = if $mode == "emoji" { $domain_info.emoji } else { $domain_info.nerd }
+                if $mode == "nerd" and ($domain_info.color? | is-not-empty) {
+                    $"(ansi ($domain_info.color))($icon)(ansi reset)"
+                } else {
+                    $icon
+                }
+            } else {
+                null
+            }
+
+            if ($domain_icon | is-not-empty) {
+                $domain_icon
+            } else {
+                let icon = if $mode == "emoji" { $TYPE_ICONS.default.emoji } else { $TYPE_ICONS.default.nerd }
+                $"(ansi light_gray)($icon)(ansi reset)"
+            }
+        }
+    }
+}
+
+# Strip HN prefixes from title
+def strip-hn-prefix [title: string]: nothing -> string {
+    let lower = ($title | str downcase)
+    if ($lower | str starts-with "ask hn: ") {
+        $title | str substring 8..
+    } else if ($lower | str starts-with "show hn: ") {
+        $title | str substring 9..
+    } else if ($lower | str starts-with "launch hn: ") {
+        $title | str substring 11..
+    } else {
+        $title
     }
 }
 
@@ -142,19 +245,53 @@ export def hn [
 
     if $json { return $stories }
 
+    let term_width = (term size).columns
+    let show_score = $term_width > 50
+    let show_cmts = $term_width > 60
+    let show_by = $term_width > 70
+    let show_domain = $term_width > 80
+    let show_type = $term_width > 90
+
+    # Compute title budget by subtracting estimated widths of other columns
+    # Estimates: Border(1) + Rank(5) + TitlePad/Border(3) = 9 base
+    let used_width = (9
+        + (if $show_score { 8 } else { 0 })   # Score: 5+2+1
+        + (if $show_cmts { 7 } else { 0 })    # Cmts: 4+2+1
+        + (if $show_by { 18 } else { 0 })     # By: 15+2+1
+        + (if $show_domain { 23 } else { 0 }) # Domain: ~20+2+1
+        + (if $show_type { 7 } else { 0 }))   # Type: 4+2+1
+    let title_budget = ([($term_width - $used_width), 20] | math max)
+
     # Build display table (1-based rank for human-friendly indexing)
     let display_table = (
         $stories | enumerate | each {|it|
             let rank = $it.index + 1
             let item = $it.item
-            {
-                "#": $rank
-                "Score": (format-score ($item.score? | default 0))
-                "Cmts": (format-comments ($item.descendants? | default 0))
-                "Title": ($item.title? | default "(no title)")
-                "By": ($item.by? | default "?" | fill -a l -w 15)
-                "Lnk": (format-link ($item.url? | default "") $icon_mode)
+
+            let title_text = ($item.title? | default "(no title)")
+            let clean_title = (strip-hn-prefix $title_text)
+
+            let trunc_title = if ($clean_title | str length) > $title_budget {
+                ($clean_title | str substring 0..($title_budget - 2)) + "…"
+            } else {
+                $clean_title
             }
+
+            let url = ($item.url? | default "")
+            let title_display = if ($url | is-empty) { $trunc_title } else { $url | ansi link --text $trunc_title }
+
+            let cmts_text = (format-comments ($item.descendants? | default 0))
+            let hn_url = $"https://news.ycombinator.com/item?id=($item.id? | default 0)"
+            let cmts_display = $hn_url | ansi link --text $cmts_text
+
+            let rec = { "#": $rank }
+            let rec = if $show_score { $rec | insert "Score" (format-score ($item.score? | default 0)) } else { $rec }
+            let rec = if $show_cmts { $rec | insert "Cmts" $cmts_display } else { $rec }
+            let rec = if $show_domain { $rec | insert "Domain" (format-domain $url $icon_mode) } else { $rec }
+            let rec = if $show_type { $rec | insert "Type" (format-type $title_text $url $icon_mode) } else { $rec }
+            let rec = $rec | insert "Title" $title_display
+            let rec = if $show_by { $rec | insert "By" ($item.by? | default "?" | fill -a l -w 15) } else { $rec }
+            $rec
         }
     )
 
