@@ -1,4 +1,4 @@
-# nu_hn — Hacker News in your terminal
+# nu_script_hnews — Hacker News in your terminal
 
 Read Hacker News from Nushell. Fetches stories, caches them for 15 minutes, and prints a table you can actually read.
 
