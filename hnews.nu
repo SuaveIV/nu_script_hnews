@@ -8,14 +8,31 @@
 # Examples:
 #   > hn                        # Fetch top 15 stories
 #   > hn 30                     # Fetch top 30
+#   > hn -N                     # Fetch new stories
+#   > hn -b                     # Fetch best stories
+#   > hn -a                     # Fetch Ask HN stories
 #   > hn -f                     # Force refresh (bypass cache)
 #   > hn -j                     # Output raw JSON
 #   > hn -e                     # Use emoji for link column
 #   > hn -t                     # Plain text mode, no icons or color
-#   > hno 1                     # Open story #1 in browser (1-based)
-#   > hno 1 -c                  # Open HN discussion for story #1
 #
 # Requires Nushell 0.97+ for $nu.cache-dir support.
+
+const COL_SCORE_MIN_WIDTH = 50
+const COL_CMTS_MIN_WIDTH = 60
+const COL_AGE_MIN_WIDTH = 60
+const COL_BY_MIN_WIDTH = 70
+const COL_DOMAIN_MIN_WIDTH = 80
+const COL_TYPE_MIN_WIDTH = 90
+
+# Estimated widths for budget calculation
+const WIDTH_BASE = 9    # Border(1) + Rank(5) + TitlePad/Border(3)
+const WIDTH_SCORE = 8   # 5+2+1
+const WIDTH_CMTS = 7    # 4+2+1
+const WIDTH_AGE = 6     # 3+2+1
+const WIDTH_BY = 18     # 15+2+1
+const WIDTH_DOMAIN = 23 # ~20+2+1
+const WIDTH_TYPE = 7    # 4+2+1
 
 const DOMAIN_ICONS = {
     "github.com": { nerd: "", emoji: "🐙", color: "#ffffff", tag: "git" }
@@ -161,6 +178,24 @@ def strip-hn-prefix [title: string]: nothing -> string {
     }
 }
 
+# Format relative time (age)
+def format-age [time: int]: nothing -> string {
+    let now_sec = ((date now) | into int) / 1_000_000_000
+    let diff = ($now_sec - $time)
+
+    if $diff < 60 {
+        $"($diff | into int)s"
+    } else if $diff < 3600 {
+        $"(($diff / 60) | into int)m"
+    } else if $diff < 86400 {
+        $"(($diff / 3600) | into int)h"
+    } else if $diff < 604800 {
+        $"(($diff / 86400) | into int)d"
+    } else {
+        $"(($diff / 604800) | into int)w"
+    }
+}
+
 # Re-order par-each results to match the original ID ordering,
 # and drop any null/deleted stories the API may have returned.
 def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
@@ -180,6 +215,10 @@ export def hn [
     --nerd (-n)                 # Use Nerd Font glyphs for icons if available
     --text (-t)                 # Plain text mode — no icons or color
     --debug (-d)                # Print debug info
+    --new (-N)                  # Fetch new stories
+    --best (-b)                 # Fetch best stories
+    --ask (-a)                  # Fetch Ask HN stories
+    --show (-s)                 # Fetch Show HN stories
 ]: nothing -> any {
     let start_fetch = (date now)
 
@@ -194,9 +233,21 @@ export def hn [
         "text"
     }
 
+    let feed = if $new {
+        "newstories"
+    } else if $best {
+        "beststories"
+    } else if $ask {
+        "askstories"
+    } else if $show {
+        "showstories"
+    } else {
+        "topstories"
+    }
+
     let cache_dir = ($nu.cache-dir | path join "nu_hn_cache")
     if not ($cache_dir | path exists) { mkdir $cache_dir }
-    let cache_file = ($cache_dir | path join "topstories.json")
+    let cache_file = ($cache_dir | path join $"($feed).json")
 
     # Check cache validity (15 minutes)
     let is_cache_valid = if $force {
@@ -210,6 +261,7 @@ export def hn [
 
     if $debug {
         print $"(ansi cyan)DEBUG: Icon mode:   ($icon_mode)(ansi reset)"
+        print $"(ansi cyan)DEBUG: Feed:        ($feed)(ansi reset)"
         print $"(ansi cyan)DEBUG: Cache file:  ($cache_file)(ansi reset)"
         print $"(ansi cyan)DEBUG: Cache valid: ($is_cache_valid)(ansi reset)"
     }
@@ -218,11 +270,11 @@ export def hn [
         if $debug { print "Loading from cache..." }
         open $cache_file
     } else {
-        print "Fetching top stories..."
+        print $"Fetching ($feed)..."
         try {
             # Fetch ranked IDs
             let ids = (
-                http get "https://hacker-news.firebaseio.com/v0/topstories.json"
+                http get $"https://hacker-news.firebaseio.com/v0/($feed).json"
                 | first $limit
             )
 
@@ -246,20 +298,22 @@ export def hn [
     if $json { return $stories }
 
     let term_width = (term size).columns
-    let show_score = $term_width > 50
-    let show_cmts = $term_width > 60
-    let show_by = $term_width > 70
-    let show_domain = $term_width > 80
-    let show_type = $term_width > 90
+    let show_score = $term_width > $COL_SCORE_MIN_WIDTH
+    let show_cmts = $term_width > $COL_CMTS_MIN_WIDTH
+    let show_age = $term_width > $COL_AGE_MIN_WIDTH
+    let show_by = $term_width > $COL_BY_MIN_WIDTH
+    let show_domain = $term_width > $COL_DOMAIN_MIN_WIDTH
+    let show_type = $term_width > $COL_TYPE_MIN_WIDTH
 
     # Compute title budget by subtracting estimated widths of other columns
     # Estimates: Border(1) + Rank(5) + TitlePad/Border(3) = 9 base
-    let used_width = (9
-        + (if $show_score { 8 } else { 0 })   # Score: 5+2+1
-        + (if $show_cmts { 7 } else { 0 })    # Cmts: 4+2+1
-        + (if $show_by { 18 } else { 0 })     # By: 15+2+1
-        + (if $show_domain { 23 } else { 0 }) # Domain: ~20+2+1
-        + (if $show_type { 7 } else { 0 }))   # Type: 4+2+1
+    let used_width = ($WIDTH_BASE
+        + (if $show_score { $WIDTH_SCORE } else { 0 })
+        + (if $show_cmts { $WIDTH_CMTS } else { 0 })
+        + (if $show_age { $WIDTH_AGE } else { 0 })
+        + (if $show_by { $WIDTH_BY } else { 0 })
+        + (if $show_domain { $WIDTH_DOMAIN } else { 0 })
+        + (if $show_type { $WIDTH_TYPE } else { 0 }))
     let title_budget = ([($term_width - $used_width), 20] | math max)
 
     # Build display table (1-based rank for human-friendly indexing)
@@ -284,9 +338,12 @@ export def hn [
             let hn_url = $"https://news.ycombinator.com/item?id=($item.id? | default 0)"
             let cmts_display = $hn_url | ansi link --text $cmts_text
 
+            let age_display = (format-age ($item.time? | default 0))
+
             let rec = { "#": $rank }
             let rec = if $show_score { $rec | insert "Score" (format-score ($item.score? | default 0)) } else { $rec }
             let rec = if $show_cmts { $rec | insert "Cmts" $cmts_display } else { $rec }
+            let rec = if $show_age { $rec | insert "Age" $age_display } else { $rec }
             let rec = if $show_domain { $rec | insert "Domain" (format-domain $url $icon_mode) } else { $rec }
             let rec = if $show_type { $rec | insert "Type" (format-type $title_text $url $icon_mode) } else { $rec }
             let rec = $rec | insert "Title" $title_display
@@ -305,40 +362,4 @@ export def hn [
     }
 
     $display_table
-}
-
-# Open a cached Hacker News story in the browser (1-based index)
-export def hno [
-    index: int = 1              # Rank of the story to open, 1-based (default: 1)
-    --comments (-c)             # Open HN discussion page instead of the article URL
-]: nothing -> nothing {
-    let cache_dir = ($nu.cache-dir | path join "nu_hn_cache")
-    let cache_file = ($cache_dir | path join "topstories.json")
-
-    if not ($cache_file | path exists) {
-        print $"(ansi red)Cache empty. Run 'hn' first.(ansi reset)"
-        return
-    }
-
-    let stories = open $cache_file
-    let real_index = $index - 1
-
-    if ($stories | length) <= $real_index or $real_index < 0 {
-        print $"(ansi red)Index ($index) out of range. Valid range: 1–($stories | length)(ansi reset)"
-        return
-    }
-
-    let story = ($stories | get $real_index)
-    let hn_url = $"https://news.ycombinator.com/item?id=($story.id? | default 0)"
-
-    if $comments {
-        print $"(ansi light_gray)Opening HN discussion for: ($story.title? | default '?')(ansi reset)"
-        start $hn_url
-    } else if ($story.url? | is-empty) {
-        print $"(ansi yellow)No external URL — opening HN discussion instead.(ansi reset)"
-        start $hn_url
-    } else {
-        print $"(ansi light_gray)Opening: ($story.url)(ansi reset)"
-        start $story.url
-    }
 }
