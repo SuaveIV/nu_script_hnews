@@ -1,19 +1,21 @@
-# nu_script_hnews — Hacker News in your terminal
+# nu_hn — Hacker News in your terminal
 
-Read Hacker News from Nushell. Fetches the top stories, caches them for 15 minutes, and prints a table you can actually read.
+Read Hacker News from Nushell. Fetches stories, caches them for 15 minutes, and prints a table you can actually read.
 
 ```nushell
 > hn
 Fetching top stories...
 Loaded 15 stories in 1sec 203ms
-╭────┬───────┬──────┬────────────────────────────────────────────────┬─────────────────┬─────╮
-│  # │ Score │ Cmts │ Title                                          │ By              │ Lnk │
-├────┼───────┼──────┼────────────────────────────────────────────────┼─────────────────┼─────┤
-│  1 │   847 │  312 │ Ask HN: What's your morning routine?           │ throwaway9182   │ [x] │
-│  2 │   432 │   88 │ I rewrote my blog in C                         │ pjmlp           │ [x] │
-│ .. │   ... │  ... │ ...                                            │ ...             │ ... │
-╰────┴───────┴──────┴────────────────────────────────────────────────┴─────────────────┴─────╯
+╭────┬───────┬──────┬─────┬────────────────────────────────────────────────┬─────────────────╮
+│  # │ Score │ Cmts │ Age │ Title                                          │ By              │
+├────┼───────┼──────┼─────┼────────────────────────────────────────────────┼─────────────────┤
+│  1 │   847 │  312 │  2h │ Ask HN: What's your morning routine?           │ throwaway9182   │
+│  2 │   432 │   88 │  4h │ I rewrote my blog in C                         │ pjmlp           │
+│ .. │   ... │  ... │ ... │ ...                                            │ ...             │
+╰────┴───────┴──────┴─────┴────────────────────────────────────────────────┴─────────────────╯
 ```
+
+Title and Cmts are clickable links in terminals that support OSC-8 (iTerm2, kitty, WezTerm, etc.).
 
 ---
 
@@ -32,8 +34,6 @@ Copy `hnews.nu` somewhere on your system, then add it to your `config.nu`:
 use /path/to/hnews.nu *
 ```
 
-Or drop it into a folder you already `use` as a module.
-
 ---
 
 ## Usage
@@ -42,61 +42,107 @@ Or drop it into a folder you already `use` as a module.
 hn              # Top 15 stories
 hn 30           # Top 30 stories
 hn -f           # Force refresh, ignore cache
+hn --new        # New stories
+hn --best       # Best stories
+hn --ask        # Ask HN
+hn --show       # Show HN
 hn -j           # Raw JSON output
 hn -r           # Raw records (no ANSI formatting)
-
-hno 3           # Open story #3's URL in your browser
-hno 3 -c        # Open the HN comments page instead
 ```
 
-### Icon modes
+---
 
-The link column (`Lnk`) can show different indicators depending on your setup:
+## Columns
 
-| Flag / env var | What you get |
-| --- | --- |
-| `--emoji` / `-e` | 🔗 |
-| `--nerd` / `-n` or `$env.NERD_FONTS = "1"` |  |
-| `--text` / `-t` (default) | `[x]` or `-` |
+Columns appear and disappear based on terminal width, so narrow windows don't wrap:
 
-Stories without an external URL (self-posts, Ask HN, etc.) show a dim dash instead.
+| Column | Min width | Notes |
+|--------|-----------|-------|
+| `#` | always | 1-based rank |
+| `Score` | 50 | Color-coded: green / yellow / red bold |
+| `Cmts` | 60 | Clickable link to HN discussion |
+| `Age` | 60 | Time since posted: `Xs` `Xm` `Xh` `Xd` `Xw` |
+| `Domain` | 80 | Source domain |
+| `Type` | 90 | Site or post-type icon (Ask, Show, Launch) |
+| `Title` | always | Clickable link to article. Truncated to fit remaining width |
+| `By` | 70 | Username |
+
+---
+
+## Icon modes
+
+| Flag | Result |
+|------|--------|
+| `--emoji` / `-e` | Emoji icons |
+| `--nerd` / `-n` | Nerd Font glyphs |
+| `--text` / `-t` | Plain text (default) |
+
+You can also set `$env.NERD_FONTS = "1"` in your `env.nu` to default to Nerd Font glyphs without passing a flag every time.
+
+---
+
+## Feeds
+
+Each feed is cached separately, so switching between them doesn't blow away your top stories cache.
+
+| Flag | Feed |
+|------|------|
+| *(default)* | Top stories |
+| `--new` / `-N` | New |
+| `--best` / `-b` | Best |
+| `--ask` / `-a` | Ask HN |
+| `--show` / `-s` | Show HN |
 
 ---
 
 ## Caching
 
-Stories are cached for **15 minutes** in `$nu.cache-dir/nu_hn_cache/topstories.json`. Run `hn -f` to bypass the cache. `hno` reads from that same cache, so run `hn` at least once before trying to open stories.
+Stories are cached for 15 minutes under `$nu.cache-dir/nu_hn_cache/`. Run `hn -f` to skip the cache and fetch fresh results.
 
 ---
 
-## Options
-
-### `hn`
+## All flags
 
 | Flag | Short | Description |
-| --- | --- | --- |
+|------|-------|-------------|
 | `--force` | `-f` | Bypass cache |
-| `--json` | `-j` | Return raw JSON |
-| `--raw` | `-r` | Return records without ANSI color |
-| `--emoji` | `-e` | Use 🔗 for link column |
-| `--nerd` | `-n` | Use Nerd Font glyph |
+| `--new` | `-N` | New stories feed |
+| `--best` | `-b` | Best stories feed |
+| `--ask` | `-a` | Ask HN feed |
+| `--show` | `-s` | Show HN feed |
+| `--json` | `-j` | Raw JSON output |
+| `--raw` | `-r` | Raw records, no ANSI color |
+| `--emoji` | `-e` | Emoji icons |
+| `--nerd` | `-n` | Nerd Font glyphs |
 | `--text` | `-t` | Plain text, no color |
-| `--debug` | `-d` | Print cache/config debug info |
-
-### `hno`
-
-| Flag | Short | Description |
-| --- | --- | --- |
-| `--comments` | `-c` | Open HN discussion instead of article |
+| `--debug` | `-d` | Print cache and icon mode info |
 
 ---
 
-## Score colors
+## Pipeline use
 
-| Score | Color |
-| --- | --- |
-| 300+ | Red bold |
-| 100–299 | Yellow |
-| < 100 | Green |
+`--raw` and `--json` are there for when you want to pipe results into something else:
 
-Comment counts follow the same idea: cyan bold for 200+, plain cyan for 50+, plain text below that.
+```nushell
+# Stories with 500+ points
+hn 50 --raw | where { |it| $it.Score > 500 }
+
+# Titles only, from the ask feed
+hn --ask --json | select title score by
+```
+
+---
+
+## Customisation
+
+Column breakpoints and width estimates are named constants at the top of `hnews.nu`:
+
+```nushell
+const COL_SCORE_MIN_WIDTH  = 50
+const COL_CMTS_MIN_WIDTH   = 60
+const COL_BY_MIN_WIDTH     = 70
+const COL_DOMAIN_MIN_WIDTH = 80
+const COL_TYPE_MIN_WIDTH   = 90
+```
+
+Adjust them if your font or table renderer makes columns wider or narrower than expected.
