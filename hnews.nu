@@ -189,8 +189,6 @@ def format-age [time: int]: nothing -> string {
 # and drop any null/deleted stories the API may have returned.
 def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
     let fetched = ($in | compact)
-    let lookup = ($fetched | each { |it| { key: ($it.id | into string), value: $it } } | into record)
-    $ids | each { |id| $lookup | get -o ($id | into string) } | compact
     $ids | each { |target_id|
         let match = ($fetched | where id == $target_id)
         if ($match | is-empty) { null } else { $match | first }
