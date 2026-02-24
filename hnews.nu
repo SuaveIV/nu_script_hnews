@@ -190,7 +190,11 @@ def format-age [time: int]: nothing -> string {
 def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
     let fetched = ($in | compact)
     let lookup = ($fetched | each { |it| { key: ($it.id | into string), value: $it } } | into record)
-    $ids | each { |id| $lookup | get --ignore-errors ($id | into string) } | compact
+    $ids | each { |id| $lookup | get -o ($id | into string) } | compact
+    $ids | each { |target_id|
+        let match = ($fetched | where id == $target_id)
+        if ($match | is-empty) { null } else { $match | first }
+    } | compact
 }
 
 # Fetch and display top Hacker News stories
@@ -273,8 +277,7 @@ export def hn [
             []
         } else {
             # Fetch details in parallel, then restore HN rank order
-            let items = (
-                $ids
+            let items = ($ids
                 | compact
                 | par-each { |id|
                     try {
