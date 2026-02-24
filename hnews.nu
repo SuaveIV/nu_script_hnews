@@ -364,8 +364,8 @@ export def hn [
                 "Title": $title_display
                 "By": ($item.by? | default "?" | fill -a l -w 15)
             }
-            | select ...$visible_columns
         }
+        | select ...$visible_columns
     )
 
     if $raw { return $display_table }
