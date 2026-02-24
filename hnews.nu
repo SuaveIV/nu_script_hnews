@@ -313,6 +313,57 @@ def build-oneline-display [stories: list<any>, icon_mode: string]: nothing -> st
     } | str join "\n"
 }
 
+# Generate hardcoded test data for offline testing
+def test-data [count: int]: nothing -> list<any> {
+    let now = (date now | format date '%s' | into int)
+    [
+        {
+            id: 1001
+            title: "Nushell: A new type of shell"
+            score: 542
+            descendants: 120
+            by: "jntrnr"
+            time: ($now - 7200)
+            url: "https://www.nushell.sh"
+            type: "story"
+            kids: [10011 10012]
+        }
+        {
+            id: 1002
+            title: "Ask HN: What is your favorite shell?"
+            score: 256
+            descendants: 85
+            by: "user1"
+            time: ($now - 1800)
+            url: ""
+            type: "story"
+            kids: []
+        }
+        {
+            id: 1003
+            title: "Show HN: A Hacker News reader in Nushell"
+            score: 89
+            descendants: 12
+            by: "suave"
+            time: ($now - 86400)
+            url: "https://github.com/nushell/nushell"
+            type: "story"
+            kids: [10031]
+        }
+        {
+            id: 1004
+            title: "Rust 1.80.0 released"
+            score: 1024
+            descendants: 340
+            by: "rust-lang"
+            time: ($now - 300)
+            url: "https://blog.rust-lang.org/"
+            type: "story"
+            kids: [10041 10042 10043]
+        }
+    ] | first $count
+}
+
 # Fetch and display top Hacker News stories
 export def hn [
     limit: int = 15             # Number of stories to fetch (default: 15)
@@ -327,6 +378,7 @@ export def hn [
     --best (-b)                 # Fetch best stories
     --ask (-a)                  # Fetch Ask HN stories
     --show (-s)                 # Fetch Show HN stories
+    --test                      # Use hardcoded test data (offline mode)
 ]: nothing -> any {
     let start_fetch = (date now)
 
@@ -358,7 +410,7 @@ export def hn [
     let cache_file = ($cache_dir | path join $"($feed).json")
 
     # Check cache validity (15 minutes)
-    let is_cache_valid = if $force {
+    let is_cache_valid = if $force or $test {
         false
     } else if ($cache_file | path exists) {
         let modified = (ls $cache_file | get modified | first)
@@ -374,7 +426,10 @@ export def hn [
         print $"(ansi cyan)DEBUG: Cache valid: ($is_cache_valid)(ansi reset)"
     }
 
-    let stories = if $is_cache_valid {
+    let stories = if $test {
+        if $debug { print "Loading test data..." }
+        test-data $limit
+    } else if $is_cache_valid {
         if $debug { print "Loading from cache..." }
         open $cache_file
     } else {
@@ -411,7 +466,9 @@ export def hn [
     if $raw { return $result }
 
     let duration = (date now) - $start_fetch
-    if not $is_cache_valid {
+    if $test {
+        print $"(ansi light_gray)Loaded test data(ansi reset)"
+    } else if not $is_cache_valid {
         print $"(ansi light_gray)Loaded ($limit) stories in ($duration)(ansi reset)"
     } else {
         print $"(ansi light_gray)Loaded from cache(ansi reset)"
