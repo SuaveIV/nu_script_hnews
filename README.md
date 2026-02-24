@@ -2,9 +2,13 @@
 
 Read Hacker News from Nushell. Fetches stories, caches them for 15 minutes, and prints a table you can actually read.
 
-<img width="1884" height="526" alt="image" src="https://github.com/user-attachments/assets/1793abbc-7c0a-4869-a73c-c06850bab78b" />
+<img width="1222" height="217" alt="image" src="https://github.com/user-attachments/assets/cd3213ab-4fe5-49a3-b334-2a43fb4909b6" />
+<img width="909" height="212" alt="image" src="https://github.com/user-attachments/assets/45dd61b6-b9f0-4488-a46f-12e8e835e6f7" />
+<img width="623" height="212" alt="image" src="https://github.com/user-attachments/assets/fdb61c6b-c08b-4556-9b2a-31f133020cca" />
+<img width="486" height="126" alt="image" src="https://github.com/user-attachments/assets/e51bf22f-ad3a-487e-9ae9-023444ce2e2a" />
 
-Title and Cmts are clickable links in terminals that support OSC-8 (iTerm2, kitty, WezTerm, etc.).
+
+> Title and Cmts are clickable links in terminals that support OSC-8 (iTerm2, kitty, WezTerm, etc.).
 
 ---
 
