@@ -1,4 +1,4 @@
-use hnews.nu hn
+use hnews.nu [hn, detect-post-type]
 use std assert
 
 export def main [] {
@@ -23,6 +23,14 @@ export def main [] {
     print $"DEBUG: Item ID: ($item.id), Kids: ($item.kids)"
     assert ($item.id == 1001)
     assert ($item.kids | is-not-empty)
+
+    # Test 3: Verify detect-post-type logic
+    print "Test 3: detect-post-type logic"
+    assert equal (detect-post-type "Ask HN: Who is hiring?" "") "ask"
+    assert equal (detect-post-type "Show HN: My Project" "") "show"
+    assert equal (detect-post-type "Launch HN: New Thing" "") "launch"
+    assert equal (detect-post-type "Regular Story" "https://github.com/nushell/nushell") "git"
+    assert equal (detect-post-type "Random Site" "https://example.com") ""
 
     print "All tests passed!"
 }

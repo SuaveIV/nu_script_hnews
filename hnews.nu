@@ -109,41 +109,58 @@ def format-domain [url: string, mode: string]: nothing -> string {
     }
 }
 
-# Format the post type (Ask, Show, Launch)
-def format-type [title: string, url: string, mode: string]: nothing -> string {
-    let lower = ($title | str downcase)
-    if ($lower | str starts-with "ask hn:") {
-        let icon = if $mode == "text" { "ask" } else if $mode == "emoji" { $TYPE_ICONS.ask.emoji } else { $TYPE_ICONS.ask.nerd }
-        $"(ansi yellow)($icon)(ansi reset)"
-    } else if ($lower | str starts-with "show hn:") {
-        let icon = if $mode == "text" { "show" } else if $mode == "emoji" { $TYPE_ICONS.show.emoji } else { $TYPE_ICONS.show.nerd }
-        $"(ansi green)($icon)(ansi reset)"
-    } else if ($lower | str starts-with "launch hn:") {
-        let icon = if $mode == "text" { "launch" } else if $mode == "emoji" { $TYPE_ICONS.launch.emoji } else { $TYPE_ICONS.launch.nerd }
-        $"(ansi red)($icon)(ansi reset)"
+# Lookup domain info from URL
+def lookup-domain-info [url: string]: nothing -> any {
+    if ($url | is-empty) {
+        null
     } else {
-        let domain_info = if ($url | is-empty) {
+        let bare_domain = (parse-domain $url)
+        let match = ($DOMAIN_ICONS | transpose key info | where {|it| ($bare_domain | str downcase) | str contains $it.key})
+        if ($match | is-empty) {
             null
         } else {
-            let bare_domain = (parse-domain $url)
-            let match = ($DOMAIN_ICONS | transpose key info | where {|it| ($bare_domain | str downcase) | str contains $it.key})
-            if ($match | is-empty) {
-                null
-            } else {
-                $match | first | get info
-            }
+            $match | first | get info
         }
+    }
+}
 
-        if $mode == "text" {
-            if ($domain_info | is-not-empty) and ($domain_info.tag? | is-not-empty) {
-                $domain_info.tag
-            } else {
-                ""
-            }
+# Detect post type tag (ask, show, launch, or domain tag)
+export def detect-post-type [title: string, url: string]: nothing -> string {
+    let lower = ($title | str downcase)
+    if ($lower | str starts-with "ask hn:") {
+        "ask"
+    } else if ($lower | str starts-with "show hn:") {
+        "show"
+    } else if ($lower | str starts-with "launch hn:") {
+        "launch"
+    } else {
+        let info = (lookup-domain-info $url)
+        if ($info | is-not-empty) and ($info.tag? | is-not-empty) {
+            $info.tag
+        } else {
+            ""
+        }
+    }
+}
+
+# Format the post type icon/text
+def format-type-icon [post_type: string, domain_info: any, icon_mode: string]: nothing -> string {
+    if $post_type == "ask" {
+        let icon = if $icon_mode == "text" { "ask" } else if $icon_mode == "emoji" { $TYPE_ICONS.ask.emoji } else { $TYPE_ICONS.ask.nerd }
+        $"(ansi yellow)($icon)(ansi reset)"
+    } else if $post_type == "show" {
+        let icon = if $icon_mode == "text" { "show" } else if $icon_mode == "emoji" { $TYPE_ICONS.show.emoji } else { $TYPE_ICONS.show.nerd }
+        $"(ansi green)($icon)(ansi reset)"
+    } else if $post_type == "launch" {
+        let icon = if $icon_mode == "text" { "launch" } else if $icon_mode == "emoji" { $TYPE_ICONS.launch.emoji } else { $TYPE_ICONS.launch.nerd }
+        $"(ansi red)($icon)(ansi reset)"
+    } else {
+        if $icon_mode == "text" {
+            $post_type
         } else {
             let domain_icon = if ($domain_info | is-not-empty) {
-                let icon = if $mode == "emoji" { $domain_info.emoji } else { $domain_info.nerd }
-                if $mode == "nerd" and ($domain_info.color? | is-not-empty) {
+                let icon = if $icon_mode == "emoji" { $domain_info.emoji } else { $domain_info.nerd }
+                if $icon_mode == "nerd" and ($domain_info.color? | is-not-empty) {
                     $"(ansi ($domain_info.color))($icon)(ansi reset)"
                 } else {
                     $icon
@@ -155,7 +172,7 @@ def format-type [title: string, url: string, mode: string]: nothing -> string {
             if ($domain_icon | is-not-empty) {
                 $domain_icon
             } else {
-                let icon = if $mode == "emoji" { $TYPE_ICONS.default.emoji } else { $TYPE_ICONS.default.nerd }
+                let icon = if $icon_mode == "emoji" { $TYPE_ICONS.default.emoji } else { $TYPE_ICONS.default.nerd }
                 $"(ansi light_gray)($icon)(ansi reset)"
             }
         }
@@ -287,13 +304,17 @@ def build-stories-display [stories: list<any>, icon_mode: string, visible_cols: 
 
         let age_display = (format-age ($item.time? | default 0))
 
+        let domain_info = (lookup-domain-info $url)
+        let post_type = (detect-post-type $title_text $url)
+        let type_display = (format-type-icon $post_type $domain_info $icon_mode)
+
         {
             "#": $rank
             "Score": (format-score ($item.score? | default 0))
             "Cmts": $cmts_display
             "Age": $age_display
             "Domain": (format-domain $url $icon_mode)
-            "Type": (format-type $title_text $url $icon_mode)
+            "Type": $type_display
             "Title": $title_display
             "By": ($item.by? | default "?" | fill -a l -w 15)
         }
