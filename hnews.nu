@@ -200,9 +200,8 @@ def format-age [time: int]: nothing -> string {
 # and drop any null/deleted stories the API may have returned.
 def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
     let fetched = ($in | compact)
-    $ids | each { |id|
-        $fetched | where { |story| $story.id? == $id } | first
-    } | compact
+    let lookup = ($fetched | each { |it| { key: ($it.id | into string), value: $it } } | into record)
+    $ids | each { |id| $lookup | get --ignore-errors ($id | into string) } | compact
 }
 
 # Fetch and display top Hacker News stories
