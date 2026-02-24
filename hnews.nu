@@ -242,6 +242,77 @@ def fetch-new-stories [feed: string, limit: int, cache_file: string]: nothing ->
     }
 }
 
+# Build the rich table display for stories
+def build-stories-display [stories: list<any>, icon_mode: string, visible_cols: list<string>]: nothing -> list<any> {
+    let term_width = (term size).columns
+
+    let show_score = ($visible_cols | any { |it| $it == "Score" })
+    let show_cmts = ($visible_cols | any { |it| $it == "Cmts" })
+    let show_age = ($visible_cols | any { |it| $it == "Age" })
+    let show_by = ($visible_cols | any { |it| $it == "By" })
+    let show_domain = ($visible_cols | any { |it| $it == "Domain" })
+    let show_type = ($visible_cols | any { |it| $it == "Type" })
+
+    # Compute title budget by subtracting estimated widths of other columns
+    let used_width = {
+        base: $WIDTH_BASE
+        score: (if $show_score { $WIDTH_SCORE } else { 0 })
+        cmts: (if $show_cmts { $WIDTH_CMTS } else { 0 })
+        age: (if $show_age { $WIDTH_AGE } else { 0 })
+        by: (if $show_by { $WIDTH_BY } else { 0 })
+        domain: (if $show_domain { $WIDTH_DOMAIN } else { 0 })
+        type: (if $show_type { $WIDTH_TYPE } else { 0 })
+    } | values | math sum
+    let title_budget = ([($term_width - $used_width), 20] | math max)
+
+    $stories | enumerate | each { |it|
+        let rank = $it.index + 1
+        let item = $it.item
+
+        let title_text = ($item.title? | default "(no title)")
+        let clean_title = (strip-hn-prefix $title_text)
+
+        let trunc_title = if ($clean_title | str length) > $title_budget {
+            ($clean_title | str substring 0..($title_budget - 2)) + "…"
+        } else {
+            $clean_title
+        }
+
+        let url = ($item.url? | default "")
+        let title_display = if ($url | is-empty) { $trunc_title } else { $url | ansi link --text $trunc_title }
+
+        let cmts_text = (format-comments ($item.descendants? | default 0))
+        let hn_url = $"https://news.ycombinator.com/item?id=($item.id? | default 0)"
+        let cmts_display = $hn_url | ansi link --text $cmts_text
+
+        let age_display = (format-age ($item.time? | default 0))
+
+        {
+            "#": $rank
+            "Score": (format-score ($item.score? | default 0))
+            "Cmts": $cmts_display
+            "Age": $age_display
+            "Domain": (format-domain $url $icon_mode)
+            "Type": (format-type $title_text $url $icon_mode)
+            "Title": $title_display
+            "By": ($item.by? | default "?" | fill -a l -w 15)
+        }
+    }
+    | select ...$visible_cols
+}
+
+# Build a compact one-line display for narrow terminals
+def build-oneline-display [stories: list<any>, icon_mode: string]: nothing -> string {
+    $stories | enumerate | each { |it|
+        let rank = $it.index + 1
+        let item = $it.item
+        let title = ($item.title? | default "(no title)")
+        let url = ($item.url? | default "")
+        let title_display = if ($url | is-empty) { $title } else { $url | ansi link --text $title }
+        $"($rank). ($title_display)"
+    } | str join "\n"
+}
+
 # Fetch and display top Hacker News stories
 export def hn [
     limit: int = 15             # Number of stories to fetch (default: 15)
@@ -320,19 +391,6 @@ export def hn [
     let show_domain = $term_width > $COL_DOMAIN_MIN_WIDTH
     let show_type = $term_width > $COL_TYPE_MIN_WIDTH
 
-    # Compute title budget by subtracting estimated widths of other columns
-    # Estimates: Border(1) + Rank(5) + TitlePad/Border(3) = 9 base
-    let used_width = {
-        base: $WIDTH_BASE
-        score: (if $show_score { $WIDTH_SCORE } else { 0 })
-        cmts: (if $show_cmts { $WIDTH_CMTS } else { 0 })
-        age: (if $show_age { $WIDTH_AGE } else { 0 })
-        by: (if $show_by { $WIDTH_BY } else { 0 })
-        domain: (if $show_domain { $WIDTH_DOMAIN } else { 0 })
-        type: (if $show_type { $WIDTH_TYPE } else { 0 })
-    } | values | math sum
-    let title_budget = ([($term_width - $used_width), 20] | math max)
-
     let visible_columns = [
         "#"
         (if $show_score { "Score" })
@@ -344,45 +402,13 @@ export def hn [
         (if $show_by { "By" })
     ] | compact
 
-    # Build display table (1-based rank for human-friendly indexing)
-    let display_table = (
-        $stories | enumerate | each { |it|
-            let rank = $it.index + 1
-            let item = $it.item
+    let result = if ($term_width < $COL_SCORE_MIN_WIDTH) and (not $raw) {
+        build-oneline-display $stories $icon_mode
+    } else {
+        build-stories-display $stories $icon_mode $visible_columns
+    }
 
-            let title_text = ($item.title? | default "(no title)")
-            let clean_title = (strip-hn-prefix $title_text)
-
-            let trunc_title = if ($clean_title | str length) > $title_budget {
-                ($clean_title | str substring 0..($title_budget - 2)) + "…"
-            } else {
-                $clean_title
-            }
-
-            let url = ($item.url? | default "")
-            let title_display = if ($url | is-empty) { $trunc_title } else { $url | ansi link --text $trunc_title }
-
-            let cmts_text = (format-comments ($item.descendants? | default 0))
-            let hn_url = $"https://news.ycombinator.com/item?id=($item.id? | default 0)"
-            let cmts_display = $hn_url | ansi link --text $cmts_text
-
-            let age_display = (format-age ($item.time? | default 0))
-
-            {
-                "#": $rank
-                "Score": (format-score ($item.score? | default 0))
-                "Cmts": $cmts_display
-                "Age": $age_display
-                "Domain": (format-domain $url $icon_mode)
-                "Type": (format-type $title_text $url $icon_mode)
-                "Title": $title_display
-                "By": ($item.by? | default "?" | fill -a l -w 15)
-            }
-        }
-        | select ...$visible_columns
-    )
-
-    if $raw { return $display_table }
+    if $raw { return $result }
 
     let duration = (date now) - $start_fetch
     if not $is_cache_valid {
@@ -391,5 +417,5 @@ export def hn [
         print $"(ansi light_gray)Loaded from cache(ansi reset)"
     }
 
-    $display_table
+    $result
 }
