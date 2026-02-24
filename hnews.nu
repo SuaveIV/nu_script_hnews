@@ -86,6 +86,16 @@ def format-comments [count: int]: nothing -> string {
     }
 }
 
+# Extract the bare domain from a URL (removes protocol and www)
+def parse-domain [url: string]: nothing -> string {
+    let domain = ($url | split row "/" | get 2)
+    if ($domain | str starts-with "www.") {
+        $domain | str substring 4..
+    } else {
+        $domain
+    }
+}
+
 # Format the domain from a URL
 def format-domain [url: string, mode: string]: nothing -> string {
     if ($url | is-empty) {
@@ -95,14 +105,7 @@ def format-domain [url: string, mode: string]: nothing -> string {
             $"(ansi light_gray)hn(ansi reset)"
         }
     } else {
-        let domain = ($url | split row "/" | get 2)
-        let bare_domain = if ($domain | str starts-with "www.") {
-            $domain | str substring 4..
-        } else {
-            $domain
-        }
-
-        $bare_domain
+        parse-domain $url
     }
 }
 
@@ -122,12 +125,7 @@ def format-type [title: string, url: string, mode: string]: nothing -> string {
         let domain_info = if ($url | is-empty) {
             null
         } else {
-            let domain = ($url | split row "/" | get 2)
-            let bare_domain = if ($domain | str starts-with "www.") {
-                $domain | str substring 4..
-            } else {
-                $domain
-            }
+            let bare_domain = (parse-domain $url)
             let match = ($DOMAIN_ICONS | transpose key info | where {|it| ($bare_domain | str downcase) | str contains $it.key})
             if ($match | is-empty) {
                 null
