@@ -164,16 +164,7 @@ def format-type [title: string, url: string, mode: string]: nothing -> string {
 
 # Strip HN prefixes from title
 def strip-hn-prefix [title: string]: nothing -> string {
-    let lower = ($title | str downcase)
-    if ($lower | str starts-with "ask hn: ") {
-        $title | str substring 8..
-    } else if ($lower | str starts-with "show hn: ") {
-        $title | str substring 9..
-    } else if ($lower | str starts-with "launch hn: ") {
-        $title | str substring 11..
-    } else {
-        $title
-    }
+    $title | str replace --regex '^(?i)(ask|show|launch) hn: ' ''
 }
 
 # Format relative time (age)
