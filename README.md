@@ -2,18 +2,8 @@
 
 Read Hacker News from Nushell. Fetches stories, caches them for 15 minutes, and prints a table you can actually read.
 
-```nushell
-> hn
-Fetching top stories...
-Loaded 15 stories in 1sec 203ms
-╭────┬───────┬──────┬─────┬────────────────────────────────────────────────┬─────────────────╮
-│  # │ Score │ Cmts │ Age │ Title                                          │ By              │
-├────┼───────┼──────┼─────┼────────────────────────────────────────────────┼─────────────────┤
-│  1 │   847 │  312 │  2h │ Ask HN: What's your morning routine?           │ throwaway9182   │
-│  2 │   432 │   88 │  4h │ I rewrote my blog in C                         │ pjmlp           │
-│ .. │   ... │  ... │ ... │ ...                                            │ ...             │
-╰────┴───────┴──────┴─────┴────────────────────────────────────────────────┴─────────────────╯
-```
+<img width="1884" height="526" alt="image" src="https://github.com/user-attachments/assets/1793abbc-7c0a-4869-a73c-c06850bab78b" />
+
 
 Title and Cmts are clickable links in terminals that support OSC-8 (iTerm2, kitty, WezTerm, etc.).
 
