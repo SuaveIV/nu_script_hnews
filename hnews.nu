@@ -169,7 +169,7 @@ def strip-hn-prefix [title: string]: nothing -> string {
 
 # Format relative time (age)
 def format-age [time: int]: nothing -> string {
-    let now_sec = ((date now) | into int) / 1_000_000_000
+    let now_sec = (date now | format date '%s' | into int)
     let diff = ($now_sec - $time)
 
     if $diff < 60 {
