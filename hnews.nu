@@ -301,13 +301,15 @@ export def hn [
 
     # Compute title budget by subtracting estimated widths of other columns
     # Estimates: Border(1) + Rank(5) + TitlePad/Border(3) = 9 base
-    let used_width = ($WIDTH_BASE
-        + (if $show_score { $WIDTH_SCORE } else { 0 })
-        + (if $show_cmts { $WIDTH_CMTS } else { 0 })
-        + (if $show_age { $WIDTH_AGE } else { 0 })
-        + (if $show_by { $WIDTH_BY } else { 0 })
-        + (if $show_domain { $WIDTH_DOMAIN } else { 0 })
-        + (if $show_type { $WIDTH_TYPE } else { 0 }))
+    let used_width = {
+        base: $WIDTH_BASE
+        score: (if $show_score { $WIDTH_SCORE } else { 0 })
+        cmts: (if $show_cmts { $WIDTH_CMTS } else { 0 })
+        age: (if $show_age { $WIDTH_AGE } else { 0 })
+        by: (if $show_by { $WIDTH_BY } else { 0 })
+        domain: (if $show_domain { $WIDTH_DOMAIN } else { 0 })
+        type: (if $show_type { $WIDTH_TYPE } else { 0 })
+    } | values | math sum
     let title_budget = ([($term_width - $used_width), 20] | math max)
 
     let visible_columns = [
