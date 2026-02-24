@@ -96,25 +96,24 @@ def parse-domain [url: string]: nothing -> string {
     }
 }
 
-# Format the domain from a URL
-def format-domain [url: string, mode: string]: nothing -> string {
-    if ($url | is-empty) {
+# Format the domain from a bare domain string
+def format-domain [bare_domain: string, mode: string]: nothing -> string {
+    if ($bare_domain | is-empty) {
         if $mode == "text" {
             "self"
         } else {
             $"(ansi light_gray)hn(ansi reset)"
         }
     } else {
-        parse-domain $url
+        $bare_domain
     }
 }
 
-# Lookup domain info from URL
-def lookup-domain-info [url: string]: nothing -> any {
-    if ($url | is-empty) {
+# Lookup domain info from bare domain
+def lookup-domain-info [bare_domain: string]: nothing -> any {
+    if ($bare_domain | is-empty) {
         null
     } else {
-        let bare_domain = (parse-domain $url)
         let match = ($DOMAIN_ICONS | transpose key info | where {|it| ($bare_domain | str downcase) | str contains $it.key})
         if ($match | is-empty) {
             null
@@ -125,7 +124,7 @@ def lookup-domain-info [url: string]: nothing -> any {
 }
 
 # Detect post type tag (ask, show, launch, or domain tag)
-export def detect-post-type [title: string, url: string]: nothing -> string {
+export def detect-post-type [title: string, bare_domain: string]: nothing -> string {
     let lower = ($title | str downcase)
     if ($lower | str starts-with "ask hn:") {
         "ask"
@@ -134,7 +133,7 @@ export def detect-post-type [title: string, url: string]: nothing -> string {
     } else if ($lower | str starts-with "launch hn:") {
         "launch"
     } else {
-        let info = (lookup-domain-info $url)
+        let info = (lookup-domain-info $bare_domain)
         if ($info | is-not-empty) and ($info.tag? | is-not-empty) {
             $info.tag
         } else {
@@ -296,6 +295,7 @@ def build-stories-display [stories: list<any>, icon_mode: string, visible_cols: 
         }
 
         let url = ($item.url? | default "")
+        let bare_domain = if ($url | is-empty) { "" } else { parse-domain $url }
         let title_display = if ($url | is-empty) { $trunc_title } else { $url | ansi link --text $trunc_title }
 
         let cmts_text = (format-comments ($item.descendants? | default 0))
@@ -304,8 +304,8 @@ def build-stories-display [stories: list<any>, icon_mode: string, visible_cols: 
 
         let age_display = (format-age ($item.time? | default 0))
 
-        let domain_info = (lookup-domain-info $url)
-        let post_type = (detect-post-type $title_text $url)
+        let domain_info = (lookup-domain-info $bare_domain)
+        let post_type = (detect-post-type $title_text $bare_domain)
         let type_display = (format-type-icon $post_type $domain_info $icon_mode)
 
         {
@@ -313,7 +313,7 @@ def build-stories-display [stories: list<any>, icon_mode: string, visible_cols: 
             "Score": (format-score ($item.score? | default 0))
             "Cmts": $cmts_display
             "Age": $age_display
-            "Domain": (format-domain $url $icon_mode)
+            "Domain": (format-domain $bare_domain $icon_mode)
             "Type": $type_display
             "Title": $title_display
             "By": ($item.by? | default "?" | fill -a l -w 15)

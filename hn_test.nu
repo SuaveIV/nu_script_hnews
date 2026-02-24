@@ -26,11 +26,13 @@ export def main [] {
 
     # Test 3: Verify detect-post-type logic
     print "Test 3: detect-post-type logic"
+    print $"DEBUG: Ask HN -> (detect-post-type 'Ask HN: Who is hiring?' '')"
     assert equal (detect-post-type "Ask HN: Who is hiring?" "") "ask"
     assert equal (detect-post-type "Show HN: My Project" "") "show"
     assert equal (detect-post-type "Launch HN: New Thing" "") "launch"
-    assert equal (detect-post-type "Regular Story" "https://github.com/nushell/nushell") "git"
-    assert equal (detect-post-type "Random Site" "https://example.com") ""
+    print $"DEBUG: github.com -> (detect-post-type 'Regular Story' 'github.com')"
+    assert equal (detect-post-type "Regular Story" "github.com") "git"
+    assert equal (detect-post-type "Random Site" "example.com") ""
 
     print "All tests passed!"
 }
