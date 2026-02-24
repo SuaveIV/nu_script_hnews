@@ -1,3 +1,14 @@
+# Test suite for hnews.nu
+#
+# Usage:
+#   > nu hn_test.nu
+#
+# Tests cover:
+# - Output structure (Table vs JSON vs String)
+# - Post type detection logic (Ask/Show/Launch/Domain tags)
+# - Display tier flags (--full, --compact, --minimal, --oneline)
+# - Demo mode execution
+
 use ./hnews.nu [hn, detect-post-type]
 use std assert
 

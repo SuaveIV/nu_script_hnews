@@ -3,18 +3,25 @@
 # Fetches and displays top Hacker News stories with caching,
 # rich formatting, and parallel fetching.
 #
+# Features:
+# - Adaptive layouts: Full, Compact, Minimal, and One-line modes based on terminal width.
+# - Icon support: Nerd Fonts, Emojis, or plain text.
+# - Caching: Caches results for 15 minutes to avoid API spam.
+# - Feeds: Top, New, Best, Ask, Show.
+#
 # Icon mode priority: --emoji / --text flag > $env.NERD_FONTS == "1" > plain text
 #
 # Examples:
 #   > hn                        # Fetch top 15 stories
 #   > hn 30                     # Fetch top 30
-#   > hn -N                     # Fetch new stories
-#   > hn -b                     # Fetch best stories
-#   > hn -a                     # Fetch Ask HN stories
+#   > hn -n                     # Fetch new stories
 #   > hn -f                     # Force refresh (bypass cache)
+#   > hn --full                 # Force full layout (all columns)
+#   > hn --compact              # Force compact layout
+#   > hn --minimal              # Force minimal layout
+#   > hn --oneline              # Single line per story
+#   > hn --demo                 # Show all layout styles
 #   > hn -j                     # Output raw JSON
-#   > hn -e                     # Use emoji for link column
-#   > hn -t                     # Plain text mode, no icons or color
 #
 # Requires Nushell 0.97+ for $nu.cache-dir support.
 
@@ -398,7 +405,7 @@ export def hn [
     --emoji (-E)                # Use emoji for icons (overrides $env.NERD_FONTS)
     --nerd (-N)                 # Use Nerd Font glyphs for icons if available
     --text (-T)                 # Plain text mode — no icons or color
-    --debug (-d)                # Print debug info
+    --debug                     # Print debug info
     --new (-n)                  # Fetch new stories
     --best (-b)                 # Fetch best stories
     --ask (-a)                  # Fetch Ask HN stories

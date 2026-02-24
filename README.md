@@ -4,7 +4,6 @@ Read Hacker News from Nushell. Fetches stories, caches them for 15 minutes, and 
 
 <img width="1884" height="526" alt="image" src="https://github.com/user-attachments/assets/1793abbc-7c0a-4869-a73c-c06850bab78b" />
 
-
 Title and Cmts are clickable links in terminals that support OSC-8 (iTerm2, kitty, WezTerm, etc.).
 
 ---
@@ -47,7 +46,7 @@ hn -r           # Raw records (no ANSI formatting)
 Columns appear and disappear based on terminal width, so narrow windows don't wrap:
 
 | Column | Min width | Notes |
-|--------|-----------|-------|
+| -------- | ----------- | ------- |
 | `#` | always | 1-based rank |
 | `Score` | 50 | Color-coded: green / yellow / red bold |
 | `Cmts` | 60 | Clickable link to HN discussion |
@@ -62,10 +61,10 @@ Columns appear and disappear based on terminal width, so narrow windows don't wr
 ## Icon modes
 
 | Flag | Result |
-|------|--------|
-| `--emoji` / `-e` | Emoji icons |
-| `--nerd` / `-n` | Nerd Font glyphs |
-| `--text` / `-t` | Plain text (default) |
+| ------ | -------- |
+| `--emoji` / `-E` | Emoji icons |
+| `--nerd` / `-N` | Nerd Font glyphs |
+| `--text` / `-T` | Plain text (default) |
 
 You can also set `$env.NERD_FONTS = "1"` in your `env.nu` to default to Nerd Font glyphs without passing a flag every time.
 
@@ -76,9 +75,9 @@ You can also set `$env.NERD_FONTS = "1"` in your `env.nu` to default to Nerd Fon
 Each feed is cached separately, so switching between them doesn't blow away your top stories cache.
 
 | Flag | Feed |
-|------|------|
+| ------ | ------ |
 | *(default)* | Top stories |
-| `--new` / `-N` | New |
+| `--new` / `-n` | New |
 | `--best` / `-b` | Best |
 | `--ask` / `-a` | Ask HN |
 | `--show` / `-s` | Show HN |
@@ -94,18 +93,24 @@ Stories are cached for 15 minutes under `$nu.cache-dir/nu_hn_cache/`. Run `hn -f
 ## All flags
 
 | Flag | Short | Description |
-|------|-------|-------------|
+| ------ | ------- | ------------- |
 | `--force` | `-f` | Bypass cache |
-| `--new` | `-N` | New stories feed |
+| `--new` | `-n` | New stories feed |
 | `--best` | `-b` | Best stories feed |
 | `--ask` | `-a` | Ask HN feed |
 | `--show` | `-s` | Show HN feed |
 | `--json` | `-j` | Raw JSON output |
 | `--raw` | `-r` | Raw records, no ANSI color |
-| `--emoji` | `-e` | Emoji icons |
-| `--nerd` | `-n` | Nerd Font glyphs |
-| `--text` | `-t` | Plain text, no color |
-| `--debug` | `-d` | Print cache and icon mode info |
+| `--emoji` | `-E` | Emoji icons |
+| `--nerd` | `-N` | Nerd Font glyphs |
+| `--text` | `-T` | Plain text, no color |
+| `--full` | `-F` | Force full width display |
+| `--compact` | `-C` | Force compact display |
+| `--minimal` | `-M` | Force minimal display |
+| `--oneline` | `-1` | Force one-line display |
+| `--demo` | | Display all layouts |
+| `--test` | | Use hardcoded test data |
+| `--debug` | | Print cache and icon mode info |
 
 ---
 
