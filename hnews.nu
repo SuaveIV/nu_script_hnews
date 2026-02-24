@@ -195,6 +195,53 @@ def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
     } | compact
 }
 
+# Helper to fetch URL with retries
+def http-get-with-retry [url: string, max_retries: int = 3, timeout: duration = 10sec]: nothing -> any {
+    for attempt in 1..$max_retries {
+        try {
+            let result = (http get --max-time $timeout $url)
+            return $result
+        } catch {
+            if $attempt == $max_retries {
+                error make {msg: $"Failed to fetch ($url) after ($max_retries) attempts"}
+            }
+            sleep 200ms
+        }
+    }
+}
+
+# Fetch stories from HN API and save to cache
+def fetch-new-stories [feed: string, limit: int, cache_file: string]: nothing -> list<any> {
+    print $"Fetching ($feed)..."
+
+    # Fetch ranked IDs
+    let ids = try {
+            http-get-with-retry $"https://hacker-news.firebaseio.com/v0/($feed).json"
+            | first $limit
+    } catch { |err|
+        print $"(ansi red)Error fetching IDs: ($err.msg)(ansi reset)"
+        []
+    }
+
+    if ($ids | is-empty) {
+        []
+    } else {
+        # Fetch details in parallel, then restore HN rank order
+        let items = ($ids
+            | compact
+            | par-each { |id|
+                try {
+                    http-get-with-retry $"https://hacker-news.firebaseio.com/v0/item/($id).json"
+                } catch { null }
+            }
+            | reorder-by-ids $ids
+        )
+
+        $items | save --force $cache_file
+        $items
+    }
+}
+
 # Fetch and display top Hacker News stories
 export def hn [
     limit: int = 15             # Number of stories to fetch (default: 15)
@@ -260,34 +307,7 @@ export def hn [
         if $debug { print "Loading from cache..." }
         open $cache_file
     } else {
-        print $"Fetching ($feed)..."
-
-        # Fetch ranked IDs
-        let ids = try {
-                http get $"https://hacker-news.firebaseio.com/v0/($feed).json"
-                | first $limit
-        } catch { |err|
-            print $"(ansi red)Error fetching IDs: ($err.msg)(ansi reset)"
-            []
-        }
-
-        if ($ids | is-empty) {
-            []
-        } else {
-            # Fetch details in parallel, then restore HN rank order
-            let items = ($ids
-                | compact
-                | par-each { |id|
-                    try {
-                        http get $"https://hacker-news.firebaseio.com/v0/item/($id).json"
-                    } catch { null }
-                }
-                | reorder-by-ids $ids
-            )
-
-            $items | save --force $cache_file
-            $items
-        }
+        fetch-new-stories $feed $limit $cache_file
     }
 
     if $json { return $stories }
