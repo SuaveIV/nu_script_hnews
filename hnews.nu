@@ -213,17 +213,24 @@ def reorder-by-ids [ids: list<int>]: list<any> -> list<any> {
 
 # Helper to fetch URL with retries
 def http-get-with-retry [url: string, max_retries: int = 3, timeout: duration = 10sec]: nothing -> any {
+    mut last_err = null
     for attempt in 1..$max_retries {
-        try {
-            let result = (http get --max-time $timeout $url)
-            return $result
-        } catch {
-            if $attempt == $max_retries {
-                error make {msg: $"Failed to fetch ($url) after ($max_retries) attempts"}
-            }
+        let result = try {
+            { ok: true, data: (http get --max-time $timeout $url) }
+        } catch { |e|
+            { ok: false, err: $e }
+        }
+
+        if $result.ok {
+            return $result.data
+        }
+
+        $last_err = $result.err
+        if $attempt < $max_retries {
             sleep 200ms
         }
     }
+    error make {msg: $"Failed to fetch ($url) after ($max_retries) attempts"}
 }
 
 # Fetch stories from HN API and save to cache
