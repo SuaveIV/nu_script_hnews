@@ -18,12 +18,9 @@
 #
 # Requires Nushell 0.97+ for $nu.cache-dir support.
 
-const COL_SCORE_MIN_WIDTH = 50
-const COL_CMTS_MIN_WIDTH = 60
-const COL_AGE_MIN_WIDTH = 60
-const COL_BY_MIN_WIDTH = 70
-const COL_DOMAIN_MIN_WIDTH = 80
-const COL_TYPE_MIN_WIDTH = 90
+const COL_FULL_WIDTH = 100
+const COL_COMPACT_WIDTH = 80
+const COL_MINIMAL_WIDTH = 60
 
 # Estimated widths for budget calculation
 const WIDTH_BASE = 9    # Border(1) + Rank(5) + TitlePad/Border(3)
@@ -398,15 +395,20 @@ export def hn [
     --force (-f)                # Bypass cache and force refresh
     --json (-j)                 # Return raw JSON data
     --raw (-r)                  # Return raw record data (no formatting)
-    --emoji (-e)                # Use emoji for icons (overrides $env.NERD_FONTS)
-    --nerd (-n)                 # Use Nerd Font glyphs for icons if available
-    --text (-t)                 # Plain text mode — no icons or color
+    --emoji (-E)                # Use emoji for icons (overrides $env.NERD_FONTS)
+    --nerd (-N)                 # Use Nerd Font glyphs for icons if available
+    --text (-T)                 # Plain text mode — no icons or color
     --debug (-d)                # Print debug info
-    --new (-N)                  # Fetch new stories
+    --new (-n)                  # Fetch new stories
     --best (-b)                 # Fetch best stories
     --ask (-a)                  # Fetch Ask HN stories
     --show (-s)                 # Fetch Show HN stories
     --test                      # Use hardcoded test data (offline mode)
+    --full (-F)                 # Force full width display (all columns)
+    --compact (-C)              # Force compact display (drop Domain and Type)
+    --minimal (-M)              # Force minimal display (drop Score and By)
+    --oneline (-1)              # Force one-line display (single line per story)
+    --demo                      # Display all layouts (for screenshots)
 ]: nothing -> any {
     let start_fetch = (date now)
 
@@ -466,26 +468,53 @@ export def hn [
 
     if $json { return $stories }
 
+    if $demo {
+        print $"(ansi cyan_bold)=== Full Layout ===(ansi reset)"
+        print (build-stories-display $stories $icon_mode ["#", "Score", "Cmts", "Age", "Domain", "Type", "Title", "By"] | table)
+        print ""
+
+        print $"(ansi cyan_bold)=== Compact Layout ===(ansi reset)"
+        print (build-stories-display $stories $icon_mode ["#", "Score", "Cmts", "Age", "Title", "By"] | table)
+        print ""
+
+        print $"(ansi cyan_bold)=== Minimal Layout ===(ansi reset)"
+        print (build-stories-display $stories $icon_mode ["#", "Cmts", "Age", "Title"] | table)
+        print ""
+
+        print $"(ansi cyan_bold)=== One-line Layout ===(ansi reset)"
+        print (build-oneline-display $stories $icon_mode)
+        return
+    }
+
     let term_width = (term size).columns
-    let show_score = $term_width > $COL_SCORE_MIN_WIDTH
-    let show_cmts = $term_width > $COL_CMTS_MIN_WIDTH
-    let show_age = $term_width > $COL_AGE_MIN_WIDTH
-    let show_by = $term_width > $COL_BY_MIN_WIDTH
-    let show_domain = $term_width > $COL_DOMAIN_MIN_WIDTH
-    let show_type = $term_width > $COL_TYPE_MIN_WIDTH
 
-    let visible_columns = [
-        "#"
-        (if $show_score { "Score" })
-        (if $show_cmts { "Cmts" })
-        (if $show_age { "Age" })
-        (if $show_domain { "Domain" })
-        (if $show_type { "Type" })
-        "Title"
-        (if $show_by { "By" })
-    ] | compact
+    let tier = if $full {
+        "full"
+    } else if $compact {
+        "compact"
+    } else if $minimal {
+        "minimal"
+    } else if $oneline {
+        "oneline"
+    } else if $term_width >= $COL_FULL_WIDTH {
+        "full"
+    } else if $term_width >= $COL_COMPACT_WIDTH {
+        "compact"
+    } else if $term_width >= $COL_MINIMAL_WIDTH {
+        "minimal"
+    } else {
+        "oneline"
+    }
 
-    let result = if ($term_width < $COL_SCORE_MIN_WIDTH) and (not $raw) {
+    let visible_columns = if $tier == "full" {
+        ["#", "Score", "Cmts", "Age", "Domain", "Type", "Title", "By"]
+    } else if $tier == "compact" {
+        ["#", "Score", "Cmts", "Age", "Title", "By"]
+    } else {
+        ["#", "Cmts", "Age", "Title"]
+    }
+
+    let result = if $tier == "oneline" and (not $raw) {
         build-oneline-display $stories $icon_mode
     } else {
         build-stories-display $stories $icon_mode $visible_columns

@@ -1,4 +1,4 @@
-use hnews.nu [hn, detect-post-type]
+use ./hnews.nu [hn, detect-post-type]
 use std assert
 
 export def main [] {
@@ -33,6 +33,39 @@ export def main [] {
     print $"DEBUG: github.com -> (detect-post-type 'Regular Story' 'github.com')"
     assert equal (detect-post-type "Regular Story" "github.com") "git"
     assert equal (detect-post-type "Random Site" "example.com") ""
+
+    # Test 4: Verify display tiers
+    print "Test 4: Display tiers"
+
+    print "DEBUG: Testing --full"
+    let full = (hn --test --full 1)
+    let full_cols = ($full | columns)
+    assert ("Domain" in $full_cols)
+    assert ("Type" in $full_cols)
+    assert ("Score" in $full_cols)
+
+    print "DEBUG: Testing --compact"
+    let compact = (hn --test --compact 1)
+    let compact_cols = ($compact | columns)
+    assert ("Domain" not-in $compact_cols)
+    assert ("Type" not-in $compact_cols)
+    assert ("Score" in $compact_cols)
+
+    print "DEBUG: Testing --minimal"
+    let minimal = (hn --test --minimal 1)
+    let minimal_cols = ($minimal | columns)
+    assert ("Score" not-in $minimal_cols)
+    assert ("By" not-in $minimal_cols)
+    assert ("Title" in $minimal_cols)
+
+    print "DEBUG: Testing --oneline"
+    let oneline = (hn --test --oneline 1)
+    assert equal ($oneline | describe) "string"
+    assert ($oneline | str contains "Nushell")
+
+    # Test 5: Verify --demo runs
+    print "Test 5: Demo mode"
+    hn --test --demo 1
 
     print "All tests passed!"
 }
